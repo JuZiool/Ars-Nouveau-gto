@@ -19,14 +19,18 @@ public class SummoningTile extends ModdedTile implements ITickable {
         super(type, pos, state);
     }
 
-    public SummoningTile(RegistryWrapper<? extends BlockEntityType<?>> type, BlockPos pos, BlockState state) {
+    public SummoningTile(
+            RegistryWrapper<? extends BlockEntityType<?>> type, BlockPos pos, BlockState state) {
         this(type.get(), pos, state);
     }
 
     @Override
     public void tick() {
-        if (level.isClientSide)
+        if (level.isClientSide) {
+            BlockState state = getBlockState();
+            if (state.hasProperty(CONVERTED) && !state.getValue(CONVERTED)) convertedEffect();
             return;
+        }
 
         if (!converted) {
             convertedEffect();
@@ -49,5 +53,4 @@ public class SummoningTile extends ModdedTile implements ITickable {
         tag.putBoolean("converted", converted);
         tag.putBoolean("off", isOff);
     }
-
 }

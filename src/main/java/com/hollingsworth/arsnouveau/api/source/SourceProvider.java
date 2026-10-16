@@ -1,6 +1,7 @@
 package com.hollingsworth.arsnouveau.api.source;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.entity.BlockEntity;
 
 public class SourceProvider implements ISpecialSourceProvider {
     private final ISourceTile tile;
@@ -13,7 +14,7 @@ public class SourceProvider implements ISpecialSourceProvider {
         this.isValid = tile != null;
     }
 
-    public SourceProvider(ISpecialSourceProvider specialSourceProvider){
+    public SourceProvider(ISpecialSourceProvider specialSourceProvider) {
         this.tile = specialSourceProvider.getSource();
         this.pos = specialSourceProvider.getCurrentPos();
         isValid = specialSourceProvider.isValid();
@@ -26,7 +27,7 @@ public class SourceProvider implements ISpecialSourceProvider {
 
     @Override
     public boolean isValid() {
-        return isValid;
+        return isValid && (!(tile instanceof BlockEntity blockEntity) || !blockEntity.isRemoved());
     }
 
     @Override

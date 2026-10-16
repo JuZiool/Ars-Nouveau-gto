@@ -3,18 +3,17 @@ package com.hollingsworth.arsnouveau.common.block.tile;
 import com.hollingsworth.arsnouveau.api.source.AbstractSourceMachine;
 import com.hollingsworth.arsnouveau.api.source.IMultiSourceTargetProvider;
 import com.hollingsworth.arsnouveau.api.util.NBTUtil;
+import com.hollingsworth.arsnouveau.client.particle.ColorPos;
 import com.hollingsworth.arsnouveau.client.particle.ParticleColor;
 import com.hollingsworth.arsnouveau.client.particle.ParticleUtil;
-import com.hollingsworth.arsnouveau.client.particle.ColorPos;
 import com.hollingsworth.arsnouveau.setup.registry.BlockRegistry;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class RelaySplitterTile extends RelayTile implements IMultiSourceTargetProvider {
 
@@ -41,10 +40,10 @@ public class RelaySplitterTile extends RelayTile implements IMultiSourceTargetPr
 
     @Override
     public List<ColorPos> getWandHighlight(List<ColorPos> list) {
-        for(BlockPos toPos : toList){
+        for (BlockPos toPos : toList) {
             list.add(ColorPos.centered(toPos, ParticleColor.TO_HIGHLIGHT));
         }
-        for(BlockPos fromPos : fromList){
+        for (BlockPos fromPos : fromList) {
             list.add(ColorPos.centered(fromPos, ParticleColor.FROM_HIGHLIGHT));
         }
         return list;
@@ -58,14 +57,12 @@ public class RelaySplitterTile extends RelayTile implements IMultiSourceTargetPr
     }
 
     public void processFromList() {
-        if (fromList.isEmpty())
-            return;
+        if (fromList.isEmpty()) return;
         ArrayList<BlockPos> stale = new ArrayList<>();
 
         int ratePer = getTransferRate() / fromList.size();
         for (BlockPos fromPos : fromList) {
-            if (!level.isLoaded(fromPos))
-                continue;
+            if (!level.isLoaded(fromPos)) continue;
 
             if (!(level.getBlockEntity(fromPos) instanceof AbstractSourceMachine fromTile)) {
                 stale.add(fromPos);
@@ -80,7 +77,6 @@ public class RelaySplitterTile extends RelayTile implements IMultiSourceTargetPr
             fromList.remove(s);
             updateBlock();
         }
-
     }
 
     public void createParticles(BlockPos from, BlockPos to) {
@@ -88,13 +84,11 @@ public class RelaySplitterTile extends RelayTile implements IMultiSourceTargetPr
     }
 
     public void processToList() {
-        if (toList.isEmpty())
-            return;
+        if (toList.isEmpty()) return;
         ArrayList<BlockPos> stale = new ArrayList<>();
         int ratePer = getSource() / toList.size();
         for (BlockPos toPos : toList) {
-            if (!level.isLoaded(toPos))
-                continue;
+            if (!level.isLoaded(toPos)) continue;
             if (!(level.getBlockEntity(toPos) instanceof AbstractSourceMachine toTile)) {
                 stale.add(toPos);
                 continue;
@@ -118,7 +112,6 @@ public class RelaySplitterTile extends RelayTile implements IMultiSourceTargetPr
 
         processFromList();
         processToList();
-        updateBlock();
     }
 
     @Override
@@ -140,8 +133,7 @@ public class RelaySplitterTile extends RelayTile implements IMultiSourceTargetPr
 
         while (NBTUtil.hasBlockPos(tag, "from_" + counter)) {
             BlockPos pos = NBTUtil.getBlockPos(tag, "from_" + counter);
-            if (!this.fromList.contains(pos))
-                this.fromList.add(pos);
+            if (!this.fromList.contains(pos)) this.fromList.add(pos);
             counter++;
         }
 
@@ -152,7 +144,6 @@ public class RelaySplitterTile extends RelayTile implements IMultiSourceTargetPr
                 this.toList.add(NBTUtil.getBlockPos(tag, "to_" + counter));
             counter++;
         }
-
     }
 
     @Override

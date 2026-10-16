@@ -61,3 +61,16 @@ Craft spells, create powerful baubles, and summon magical creatures!
     versionRange="[4.2.1,)"
     ordering="AFTER"
     side="BOTH"
+
+[[dependencies.ars_nouveau]]
+    modId="gtceu"
+    mandatory=true
+    versionRange="[26.10.53,)"
+    ordering="AFTER"
+    side="BOTH"
+[[dependencies.ars_nouveau]]
+    modId="datasynclib"
+    mandatory=true
+    versionRange="[26.10.11,)"
+    ordering="AFTER"
+    side="BOTH"

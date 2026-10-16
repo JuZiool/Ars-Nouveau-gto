@@ -1,0 +1,15 @@
+pluginManagement {
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == 'com.diffplug.spotless') {
+                useModule("com.diffplug.spotless:spotless-plugin-gradle:${requested.version}")
+            }
+        }
+    }
+    repositories {
+        gradlePluginPortal()
+        maven { url = 'https://maven.minecraftforge.net' }
+    }
+}
+
+rootProject.name = 'Ars-Nouveau-GTO'

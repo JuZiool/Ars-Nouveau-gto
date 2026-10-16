@@ -1,105 +1,157 @@
 package com.hollingsworth.arsnouveau.api.source;
 
-import com.hollingsworth.arsnouveau.ArsNouveau;
+import com.gregtechceu.gtceu.core.ILevel;
+import com.gregtechceu.gtceu.utils.TaskHandler;
+import com.gto.datasynclib.datastream.DataComponentKey;
+import com.hollingsworth.arsnouveau.common.block.tile.SourceJarTile;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Predicate;
+import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import org.jetbrains.annotations.NotNull;
 
-import javax.annotation.Nullable;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-
-@Mod.EventBusSubscriber(modid = ArsNouveau.MODID)
-public class SourceManager {
-    private Map<String, Set<ISpecialSourceProvider>> posMap = new ConcurrentHashMap<>();
-
-    public void addInterface(Level world, ISpecialSourceProvider pos) {
-        String key = world.dimension().location().toString();
-        if (!posMap.containsKey(key))
-            posMap.put(key, new HashSet<>());
-
-        posMap.get(key).add(pos);
-    }
-
-    public @NotNull Set<ISpecialSourceProvider> getSetForLevel(Level world){
-        String key = world.dimension().location().toString();
-        return posMap.computeIfAbsent(key, k -> new HashSet<>());
-    }
-
-    public Set<ISpecialSourceProvider> getCopySetForLevel(Level world){
-        return new HashSet<>(getSetForLevel(world));
-    }
-
-    @Nullable
-    public ISpecialSourceProvider takeSourceNearby(BlockPos pos, Level world, int range, int amount){
-        for(ISpecialSourceProvider sourceInterface : getCopySetForLevel(world)){
-            if(sourceInterface.isValid() && sourceInterface.getCurrentPos().closerThan(pos, range)){
-                sourceInterface.getSource().removeSource(amount);
-                return sourceInterface;
-            }
-        }
-        return null;
-    }
-
-    @Nullable
-    public ISpecialSourceProvider hasSourceNearby(BlockPos pos, Level world, int range, int amount){
-        for(ISpecialSourceProvider sourceInterface : getCopySetForLevel(world)){
-            if(sourceInterface.isValid() && sourceInterface.getCurrentPos().closerThan(pos, range) && sourceInterface.getSource().getSource() >= amount){
-                return sourceInterface;
-            }
-        }
-        return null;
-    }
-
-    public List<ISpecialSourceProvider> canGiveSourceNearby(BlockPos pos, Level world, int range){
-        List<ISpecialSourceProvider> list = new ArrayList<>();
-        for(ISpecialSourceProvider sourceInterface : getCopySetForLevel(world)){
-            if(sourceInterface.isValid() && sourceInterface.getCurrentPos().closerThan(pos, range) && sourceInterface.getSource().canAcceptSource()){
-                list.add(sourceInterface);
-            }
-        }
-        return list;
-    }
-
-    public List<ISpecialSourceProvider> canTakeSourceNearby(BlockPos pos, Level world, int range){
-        List<ISpecialSourceProvider> list = new ArrayList<>();
-        for(ISpecialSourceProvider sourceInterface : getCopySetForLevel(world)){
-            if(sourceInterface.isValid() && sourceInterface.getCurrentPos().closerThan(pos, range) && sourceInterface.getSource().getSource() >= 0){
-                list.add(sourceInterface);
-            }
-        }
-        return list;
-    }
-
-    public void tick(Level level){
-        if(level.getGameTime() % 60 == 0){
-            Set<ISpecialSourceProvider> stale = new HashSet<>();
-            for(ISpecialSourceProvider iSourceInterface : getSetForLevel(level)){
-                if(!iSourceInterface.isValid()){
-                    stale.add(iSourceInterface);
-                }
-            }
-            Set<ISpecialSourceProvider> set = getSetForLevel(level);
-            for(ISpecialSourceProvider iSourceInterface : stale){
-                set.remove(iSourceInterface);
-            }
-        }
-    }
-
-    public static SourceManager INSTANCE = new SourceManager();
+public final class SourceManager {
+    public static final SourceManager INSTANCE = new SourceManager();
+    private static final DataComponentKey<LevelSources> SOURCES =
+            DataComponentKey.createNoCodec("ars_nouveau:source_index");
 
     private SourceManager() {}
 
+    private static LevelSources get(Level level) {
+        LevelSources sources = ILevel.getCapability(level, SOURCES);
+        if (sources == null) {
+            sources = new LevelSources(level);
+            ILevel.setCapability(level, SOURCES, sources);
+        }
+        return sources;
+    }
 
-    @SubscribeEvent
-    public static void serverTick(TickEvent.LevelTickEvent e) {
+    public void addJar(SourceJarTile jar) {
+        BlockPos pos = jar.getBlockPos();
+        get(jar.getLevel()).jars.put(jar.getSourceProvider(), pos.getX(), pos.getY(), pos.getZ());
+    }
 
-        if (e.level.isClientSide || e.phase != TickEvent.Phase.END)
-            return;
+    public void removeJar(SourceJarTile jar) {
+        LevelSources sources = ILevel.getCapability(jar.getLevel(), SOURCES);
+        if (sources != null) sources.jars.remove(jar.getSourceProvider());
+    }
 
-        INSTANCE.tick(e.level);
+    public ArrayList<ISpecialSourceProvider> findJars(
+            BlockPos pos, Level level, int range, boolean accepting, int amount) {
+        ArrayList<ISpecialSourceProvider> result =
+                get(level)
+                        .jars
+                        .find(
+                                pos.getX(),
+                                pos.getY(),
+                                pos.getZ(),
+                                range,
+                                provider ->
+                                        provider.isValid()
+                                                && level.hasChunkAt(provider.getCurrentPos())
+                                                && (accepting
+                                                        ? provider.getSource().canAcceptSource()
+                                                        : provider.getSource().getSource()
+                                                                >= amount));
+        result.sort(
+                (first, second) ->
+                        Long.compare(
+                                distance(pos, first.getCurrentPos()),
+                                distance(pos, second.getCurrentPos())));
+        return result;
+    }
+
+    private static long distance(BlockPos first, BlockPos second) {
+        return Math.abs((long) first.getX() - second.getX())
+                + Math.abs((long) first.getY() - second.getY())
+                + Math.abs((long) first.getZ() - second.getZ());
+    }
+
+    public void addInterface(Level level, ISpecialSourceProvider provider) {
+        LevelSources sources = get(level);
+        sources.special.add(provider);
+        BlockPos pos = provider.getCurrentPos();
+        sources.providers.put(provider, pos.getX(), pos.getY(), pos.getZ());
+    }
+
+    public Set<ISpecialSourceProvider> getSetForLevel(Level level) {
+        return get(level).special;
+    }
+
+    public Set<ISpecialSourceProvider> getCopySetForLevel(Level level) {
+        return get(level).special.clone();
+    }
+
+    private ArrayList<ISpecialSourceProvider> findSpecial(
+            BlockPos pos, Level level, int range, Predicate<ISpecialSourceProvider> filter) {
+        return get(level)
+                .providers
+                .find(
+                        pos.getX(),
+                        pos.getY(),
+                        pos.getZ(),
+                        range,
+                        provider ->
+                                provider.isValid()
+                                        && level.hasChunkAt(provider.getCurrentPos())
+                                        && provider.getCurrentPos().closerThan(pos, range)
+                                        && filter.test(provider));
+    }
+
+    @Nullable
+    public ISpecialSourceProvider takeSourceNearby(
+            BlockPos pos, Level level, int range, int amount) {
+        ISpecialSourceProvider provider = hasSourceNearby(pos, level, range, amount);
+        if (provider != null) provider.getSource().removeSource(amount);
+        return provider;
+    }
+
+    @Nullable
+    public ISpecialSourceProvider hasSourceNearby(
+            BlockPos pos, Level level, int range, int amount) {
+        ArrayList<ISpecialSourceProvider> providers =
+                findSpecial(
+                        pos, level, range, provider -> provider.getSource().getSource() >= amount);
+        return providers.isEmpty() ? null : providers.get(0);
+    }
+
+    public List<ISpecialSourceProvider> canGiveSourceNearby(BlockPos pos, Level level, int range) {
+        return findSpecial(pos, level, range, provider -> provider.getSource().canAcceptSource());
+    }
+
+    public List<ISpecialSourceProvider> canTakeSourceNearby(BlockPos pos, Level level, int range) {
+        return findSpecial(pos, level, range, provider -> provider.getSource().getSource() > 0);
+    }
+
+    public void tick(Level level) {
+        get(level).refreshSpecial();
+    }
+
+    private static final class LevelSources {
+        private final SourceOctree<ISpecialSourceProvider> jars = new SourceOctree<>();
+        private final SourceOctree<ISpecialSourceProvider> providers = new SourceOctree<>();
+        private final ReferenceOpenHashSet<ISpecialSourceProvider> special =
+                new ReferenceOpenHashSet<>();
+
+        private LevelSources(Level level) {
+            TaskHandler.enqueueTick(level, this::refreshSpecial, 1, 0);
+        }
+
+        private void refreshSpecial() {
+            var iterator = special.iterator();
+            while (iterator.hasNext()) {
+                ISpecialSourceProvider provider = iterator.next();
+                if (!provider.isValid()) {
+                    providers.remove(provider);
+                    iterator.remove();
+                } else {
+                    BlockPos pos = provider.getCurrentPos();
+                    providers.put(provider, pos.getX(), pos.getY(), pos.getZ());
+                }
+            }
+        }
     }
 }
