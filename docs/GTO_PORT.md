@@ -13,15 +13,27 @@
 - 已实现 Level capability 持有的八叉树魔源索引；独立 JDK 测试通过 12,000 次随机增删、移动和查询对照，并覆盖对象身份、重复坐标和整数边界。
 - 已接入 DataSyncLib 的魔源、颜色和粒子路径增量同步；去掉中继传输和分流中继周期性的全量 NBT 更新。
 - 已将魔源跟随、仪式天空、召唤和取药动画接入客户端生成路径；仍需审查其余服务器粒子发送点。
-- spotlessApply 和 spotlessCheck 已通过。完整编译尚未通过，构建和客户端/专用服务器验证未完成，暂无可交付 jar。
-- 本次为 `1.20` 分支的性能重构进度提交，不作为经过完整验证的发布版本。
+- 2026-10-17：spotlessApply、spotlessCheck、Java 编译、测试、完整构建及普通/内嵌依赖 JAR 的重混淆均已通过，已生成本地测试产物。
+- 客户端/专用服务器验证和实际带宽对比尚未进行；本次产物用于后续游戏内测试。
+
+## 本地构建验证（2026-10-17）
+
+- 环境：Windows、Zulu JDK 21、Gradle Wrapper 8.14.5、Forge 47.4.21。
+- 命令：使用 JDK 21 执行 `gradlew.bat spotlessApply spotlessCheck build jarJar --console=plain`。
+- 结果：`BUILD SUCCESSFUL`；`checkSourceOctree` 通过 12,000 次随机操作及对象身份、重复坐标、整数边界检查。
+- 构建修复：MixinExtras 改用 Maven Central 的 `io.github.llamalad7` 坐标和 0.4.1 版本，移除重复的旧 JitPack 注解处理器依赖。
+- 测试产物：`build/libs/ars_nouveau-1.20.1-4.12.7-gto.1-all.jar`，已执行 `reobfJarJar`，内嵌 MixinExtras 0.4.1 与 GeckoLib 4.4.4。
+- 已检查成品的模组声明、Mixin 配置、refmap、JarJar 元数据及新增实现类；GTM、DataSyncLib 和其他必需前置仍须在游戏运行环境中安装。
+- 构建日志：`build/reports/local-build.log`。编译有旧 API 弃用等警告，未出现编译错误。
+- DataSyncLib：魔源值、上限、颜色和粒子路径由 GTM 异步任务调用字段级变更检测；使用 `all=false` 发送增量，新区块加载使用独立管理器生成初始全量数据。
 
 ## 待完成
 
 - [ ] 通过 GTM TaskHandler 运行 tick 和异步增量同步。
 - [ ] 魔源搜索改为随 Level 生命周期保存的八叉树索引。
 - [ ] 持续粒子在客户端产生，服务器只传必要的状态或一次性触发。
-- [ ] 格式检查、编译、测试、完整构建和客户端/专用服务器验证。
+- [x] 格式检查、编译、测试和完整构建。
+- [ ] 客户端/专用服务器验证及网络流量对比。
 - [ ] 在 GregTech-Odyssey 创建并交付 fork。
 
 ## 外部状态
