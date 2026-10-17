@@ -10,6 +10,7 @@ import com.hollingsworth.arsnouveau.common.spell.augment.AugmentAOE;
 import com.hollingsworth.arsnouveau.common.spell.augment.AugmentAmplify;
 import com.hollingsworth.arsnouveau.common.spell.augment.AugmentExtract;
 import com.hollingsworth.arsnouveau.common.spell.augment.AugmentFortune;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
@@ -21,38 +22,73 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraftforge.common.ForgeConfigSpec;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Set;
-
 public class EffectFell extends AbstractEffect {
     public static EffectFell INSTANCE = new EffectFell();
-
 
     private EffectFell() {
         super(GlyphLib.EffectFellID, "Fell");
     }
 
     @Override
-    public void onResolveBlock(BlockHitResult ray, Level world, @NotNull LivingEntity shooter, SpellStats spellStats, SpellContext spellContext, SpellResolver resolver) {
+    public void onResolveBlock(
+            BlockHitResult ray,
+            Level world,
+            @NotNull LivingEntity shooter,
+            SpellStats spellStats,
+            SpellContext spellContext,
+            SpellResolver resolver) {
         BlockPos blockPos = ray.getBlockPos();
         BlockState state = world.getBlockState(blockPos);
         if (isTree(state)) {
-            Set<BlockPos> list = getTree(world, blockPos, (int) (GENERIC_INT.get() + Math.round(AOE_BONUS.get() * spellStats.getAoeMultiplier())));
+            Set<BlockPos> list =
+                    getTree(
+                            world,
+                            blockPos,
+                            (int)
+                                    (GENERIC_INT.get()
+                                            + Math.round(
+                                                    AOE_BONUS.get()
+                                                            * spellStats.getAoeMultiplier())));
             world.levelEvent(2001, blockPos, Block.getId(state));
-            list.forEach(listPos -> {
-                if (!BlockUtil.destroyRespectsClaim(shooter, world, listPos))
-                    return;
-                if (spellStats.hasBuff(AugmentExtract.INSTANCE)) {
-                    world.getBlockState(listPos).getDrops(LootUtil.getSilkContext((ServerLevel) world, listPos, shooter)).forEach(i -> world.addFreshEntity(new ItemEntity(world, listPos.getX(), listPos.getY(), listPos.getZ(), i)));
-                    BlockUtil.destroyBlockSafelyWithoutSound(world, listPos, false);
-                } else if (spellStats.hasBuff(AugmentFortune.INSTANCE)) {
-                    world.getBlockState(listPos)
-                            .getDrops(LootUtil.getFortuneContext((ServerLevel) world, listPos, shooter, spellStats.getBuffCount(AugmentFortune.INSTANCE)))
-                            .forEach(i -> world.addFreshEntity(new ItemEntity(world, listPos.getX(), listPos.getY(), listPos.getZ(), i)));
-                    BlockUtil.destroyBlockSafelyWithoutSound(world, listPos, false);
-                } else {
-                    BlockUtil.destroyBlockSafelyWithoutSound(world, listPos, true);
-                }
-            });
+            boolean extract = spellStats.hasBuff(AugmentExtract.INSTANCE);
+            int fortune = spellStats.getBuffCount(AugmentFortune.INSTANCE);
+            list.forEach(
+                    listPos -> {
+                        if (!BlockUtil.destroyRespectsClaim(shooter, world, listPos)) return;
+                        if (extract) {
+                            world.getBlockState(listPos)
+                                    .getDrops(
+                                            LootUtil.getSilkContext(
+                                                    (ServerLevel) world, listPos, shooter))
+                                    .forEach(
+                                            i ->
+                                                    world.addFreshEntity(
+                                                            new ItemEntity(
+                                                                    world,
+                                                                    listPos.getX(),
+                                                                    listPos.getY(),
+                                                                    listPos.getZ(),
+                                                                    i)));
+                            BlockUtil.destroyBlockSafelyWithoutSound(world, listPos, false);
+                        } else if (fortune > 0) {
+                            world.getBlockState(listPos)
+                                    .getDrops(
+                                            LootUtil.getFortuneContext(
+                                                    (ServerLevel) world, listPos, shooter, fortune))
+                                    .forEach(
+                                            i ->
+                                                    world.addFreshEntity(
+                                                            new ItemEntity(
+                                                                    world,
+                                                                    listPos.getX(),
+                                                                    listPos.getY(),
+                                                                    listPos.getZ(),
+                                                                    i)));
+                            BlockUtil.destroyBlockSafelyWithoutSound(world, listPos, false);
+                        } else {
+                            BlockUtil.destroyBlockSafelyWithoutSound(world, listPos, true);
+                        }
+                    });
         }
     }
 
@@ -62,7 +98,9 @@ public class EffectFell extends AbstractEffect {
     public void buildConfig(ForgeConfigSpec.Builder builder) {
         super.buildConfig(builder);
         addGenericInt(builder, 50, "Base amount of harvested blocks", "base_harvest");
-        AOE_BONUS = builder.comment("Additional max blocks per AOE").defineInRange("aoe_bonus", 50, 0, Integer.MAX_VALUE);
+        AOE_BONUS =
+                builder.comment("Additional max blocks per AOE")
+                        .defineInRange("aoe_bonus", 50, 0, Integer.MAX_VALUE);
     }
 
     public boolean isTree(BlockState blockstate) {
@@ -72,7 +110,6 @@ public class EffectFell extends AbstractEffect {
     public Set<BlockPos> getTree(Level world, BlockPos start, int maxBlocks) {
         return SpellUtil.DFSBlockstates(world, start, maxBlocks, this::isTree);
     }
-
 
     @Override
     public int getDefaultManaCost() {
@@ -84,15 +121,14 @@ public class EffectFell extends AbstractEffect {
         return SpellTier.ONE;
     }
 
-   @NotNull
+    @NotNull
     @Override
     public Set<AbstractAugment> getCompatibleAugments() {
         return augmentSetOf(
                 AugmentAOE.INSTANCE,
                 AugmentExtract.INSTANCE,
                 AugmentFortune.INSTANCE,
-                AugmentAmplify.INSTANCE
-        );
+                AugmentAmplify.INSTANCE);
     }
 
     @Override
@@ -100,7 +136,7 @@ public class EffectFell extends AbstractEffect {
         return "Harvests entire trees, mushrooms, cactus, and other vegetation. Can be amplified with Amplify to break materials of higher hardness. AOE will increase the number of blocks that may be broken at one time.";
     }
 
-   @NotNull
+    @NotNull
     @Override
     public Set<SpellSchool> getSchools() {
         return setOf(SpellSchools.ELEMENTAL_EARTH);

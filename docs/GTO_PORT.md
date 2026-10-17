@@ -16,6 +16,26 @@
 - 2026-10-17：spotlessApply、spotlessCheck、Java 编译、测试、完整构建及普通/内嵌依赖 JAR 的重混淆均已通过，已生成本地测试产物。
 - 客户端/专用服务器验证和实际带宽对比尚未进行；本次产物用于后续游戏内测试。
 
+## spark 热点优化（2026-10-17，未构建）
+
+输入：`反馈/profile-2026-10-17_06.48.11.sparkprofile`；服务器线程采样约 157 秒，间隔 4 毫秒。
+以下是同一调用分支的包含子调用时间，存在嵌套，不能相加：
+
+| 采样路径 | 时间 | 占服务器线程采样 |
+| --- | --- | --- |
+| 法术炮台 `BasicSpellTurret.shootSpell` | 10,288 ms | 6.56% |
+| 炮台扣源 `SourceUtil.takeSourceWithParticles` | 4,708 ms | 3.00% |
+| 伐木 `EffectFell.onResolveBlock` | 3,848 ms | 2.45% |
+| 伐木连通遍历 `SpellUtil.DFSBlockstates` | 236 ms | 0.15% |
+
+- 扣源先查询已有八叉树中的魔源罐和已注册特殊供源；有足量供源时跳过 `canTakeSource` 的兼容注入，避免其再次逐方块扫描。索引内没有足量供源时仍走原兼容路径；魔源罐优先级、单一供源及正魔源筛选保持原逻辑。
+- `SpellStats` 的增幅计数改为循环，存在性查询提前结束；伐木每次施法只查询一次精准采集和时运参数。
+- 连通遍历用 `ArrayDeque` 替代链表，直接迭代邻居，减少队列节点和 Stream 分配；保留原遍历顺序和采集数量上限。
+- 未跳过领地/破坏事件、掉落生成或相邻方块更新；采样中伐木的主要剩余成本在这些实际游戏逻辑中。
+- 独立校验：`scripts/check_profile_hotpaths.py` 抽取实际修改方法，与提交 `4138e7da2` 对照；5,000 次供源选择/扣除、9,000 次增幅查询、300 次连通遍历对照均通过。使用 Python 3 与 JDK 21，运行 `python scripts/check_profile_hotpaths.py --java <JDK21>/bin/java.exe`。
+- 本轮仅做独立方法校验、Java 语法解析和改动段格式化、`git diff --check`；未调用 Gradle、未构建模组。校验使用简化的世界/供源替身，Forge/Mixin 集成和实际性能收益仍需游戏内复测；旧采样不代表修改后的收益。
+- 2026-10-17 推送前：使用 JDK 21 执行 `spotlessApply spotlessCheck --offline --console=plain`，格式整理与检查通过；随后再次通过独立方法对照校验。本轮未执行编译或模组构建。
+
 ## 本地构建验证（2026-10-17）
 
 - 环境：Windows、Zulu JDK 21、Gradle Wrapper 8.14.5、Forge 47.4.21。

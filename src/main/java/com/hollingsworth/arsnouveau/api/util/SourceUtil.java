@@ -38,6 +38,18 @@ public class SourceUtil {
 
     public static @Nullable ISpecialSourceProvider takeSource(
             BlockPos pos, Level level, int range, int source) {
+        // Prefer indexed providers; only scan compatibility sources when neither index suffices.
+        int minimum = Math.max(1, source);
+        ArrayList<ISpecialSourceProvider> jars =
+                SourceManager.INSTANCE.findJars(pos, level, range, false, minimum);
+        ISpecialSourceProvider indexed =
+                jars.isEmpty()
+                        ? SourceManager.INSTANCE.hasSourceNearby(pos, level, range, minimum)
+                        : jars.get(0);
+        if (indexed != null) {
+            indexed.getSource().removeSource(source);
+            return indexed;
+        }
         List<ISpecialSourceProvider> providers = canTakeSource(pos, level, range);
         for (ISpecialSourceProvider provider : providers) {
             if (provider.getSource().getSource() >= source) {

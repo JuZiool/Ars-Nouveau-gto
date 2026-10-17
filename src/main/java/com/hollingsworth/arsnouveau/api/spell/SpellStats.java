@@ -3,6 +3,9 @@ package com.hollingsworth.arsnouveau.api.spell;
 import com.hollingsworth.arsnouveau.api.event.SpellModifierEvent;
 import com.hollingsworth.arsnouveau.api.item.ISpellModifierItem;
 import com.hollingsworth.arsnouveau.api.util.CuriosUtil;
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.Nullable;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
@@ -12,16 +15,11 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.HitResult;
 import net.minecraftforge.common.MinecraftForge;
 
-import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.List;
-
-/**
- * A wrapper for spell modifiers as they exist for a single effect before resolving.
- */
+/** A wrapper for spell modifiers as they exist for a single effect before resolving. */
 public class SpellStats {
 
-    //true if at least one sensitive augment is present, keep using getBuffCount() for more than one
+    // true if at least one sensitive augment is present, keep using getBuffCount() for more than
+    // one
     private boolean sensitive = false;
 
     private double amplification;
@@ -50,20 +48,32 @@ public class SpellStats {
     }
 
     public int getBuffCount(AbstractAugment abstractAugment) {
-        return (int) augments.stream().filter(abstractAugment::equals).count();
+        int count = 0;
+        for (AbstractAugment augment : augments) {
+            if (abstractAugment.equals(augment)) count++;
+        }
+        return count;
     }
 
     public boolean hasBuff(AbstractAugment abstractAugment) {
-        return getBuffCount(abstractAugment) > 0;
+        return augments.contains(abstractAugment);
     }
 
     public List<Component> addTooltip(List<Component> components) {
         if (this.damageModifier != 0.0d)
-            components.add(Component.translatable("tooltip.ars_nouveau.spell_damage", this.damageModifier).setStyle(Style.EMPTY.withColor(ChatFormatting.BLUE)));
+            components.add(
+                    Component.translatable("tooltip.ars_nouveau.spell_damage", this.damageModifier)
+                            .setStyle(Style.EMPTY.withColor(ChatFormatting.BLUE)));
         if (this.getDurationMultiplier() != 0.0d)
-            components.add(Component.translatable("tooltip.ars_nouveau.duration_modifier", this.getDurationMultiplier()).setStyle(Style.EMPTY.withColor(ChatFormatting.GREEN)));
+            components.add(
+                    Component.translatable(
+                                    "tooltip.ars_nouveau.duration_modifier",
+                                    this.getDurationMultiplier())
+                            .setStyle(Style.EMPTY.withColor(ChatFormatting.GREEN)));
         if (this.amplification != 0.0d)
-            components.add(Component.translatable("tooltip.ars_nouveau.amp_modifier", this.amplification).setStyle(Style.EMPTY.withColor(ChatFormatting.RED)));
+            components.add(
+                    Component.translatable("tooltip.ars_nouveau.amp_modifier", this.amplification)
+                            .setStyle(Style.EMPTY.withColor(ChatFormatting.RED)));
 
         return components;
     }
@@ -135,19 +145,35 @@ public class SpellStats {
             this.spellStats = new SpellStats();
         }
 
-        public SpellStats build(AbstractSpellPart spellPart, @Nullable HitResult rayTraceResult, Level world, @Nullable LivingEntity shooter, SpellContext spellContext) {
+        public SpellStats build(
+                AbstractSpellPart spellPart,
+                @Nullable HitResult rayTraceResult,
+                Level world,
+                @Nullable LivingEntity shooter,
+                SpellContext spellContext) {
             for (AbstractAugment abstractAugment : spellStats.augments) {
-                abstractAugment.applyModifiers(this, spellPart, rayTraceResult, world, shooter, spellContext);
+                abstractAugment.applyModifiers(
+                        this, spellPart, rayTraceResult, world, shooter, spellContext);
             }
 
             for (ItemStack stack : spellStats.modifierItems) {
                 if (stack.getItem() instanceof ISpellModifierItem) {
                     for (int i = 0; i < stack.getCount(); i++) {
-                        ((ISpellModifierItem) stack.getItem()).applyItemModifiers(stack, this, spellPart, rayTraceResult, world, shooter, spellContext);
+                        ((ISpellModifierItem) stack.getItem())
+                                .applyItemModifiers(
+                                        stack,
+                                        this,
+                                        spellPart,
+                                        rayTraceResult,
+                                        world,
+                                        shooter,
+                                        spellContext);
                     }
                 }
             }
-            SpellModifierEvent modifierEvent = new SpellModifierEvent(shooter, this, spellPart, rayTraceResult, world, spellContext);
+            SpellModifierEvent modifierEvent =
+                    new SpellModifierEvent(
+                            shooter, this, spellPart, rayTraceResult, world, spellContext);
             MinecraftForge.EVENT_BUS.post(modifierEvent);
             return spellStats;
         }
@@ -176,18 +202,17 @@ public class SpellStats {
             return this;
         }
 
-        /**
-         * Pulls all items from hands, curios, and armor.
-         */
+        /** Pulls all items from hands, curios, and armor. */
         public Builder addItemsFromEntity(@Nullable LivingEntity entity) {
-            if (entity == null)
-                return this;
-            CuriosUtil.getAllWornItems(entity).ifPresent(e -> {
-                for (int i = 0; i < e.getSlots(); i++) {
-                    ItemStack item = e.getStackInSlot(i);
-                    spellStats.modifierItems.add(item);
-                }
-            });
+            if (entity == null) return this;
+            CuriosUtil.getAllWornItems(entity)
+                    .ifPresent(
+                            e -> {
+                                for (int i = 0; i < e.getSlots(); i++) {
+                                    ItemStack item = e.getStackInSlot(i);
+                                    spellStats.modifierItems.add(item);
+                                }
+                            });
             for (ItemStack i : entity.getAllSlots()) {
                 spellStats.modifierItems.add(i);
             }
@@ -256,5 +281,4 @@ public class SpellStats {
             return this;
         }
     }
-
 }
